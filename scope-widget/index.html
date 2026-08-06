@@ -123,12 +123,14 @@
         user-select: none;
         cursor: pointer;
         pointer-events: auto;
+        transition:
+          background-color 180ms ease,
+          border-color 180ms ease;
       }
 
       .cell.selected {
         background: rgba(255, 255, 255, 0.2);
-        /* outline: 2px solid #fff; */
-        /* outline-offset: -2px; */
+        border-color: #fff;
       }
     </style>
   </head>
@@ -223,7 +225,9 @@
         widget.style.top = `${clampedTop}px`;
       }
 
-      function setSelectedCell(cell) {
+      function setSelectedCell(cell, options = {}) {
+        const { snapWidget = false } = options;
+
         if (selectedCell && selectedCell !== cell) {
           selectedCell.classList.remove("selected");
         }
@@ -233,11 +237,14 @@
         if (selectedCell) {
           selectedCell.classList.add("selected");
         }
+
+        if (snapWidget && selectedCell) {
+          positionWidgetAtCell(selectedCell);
+        }
       }
 
       function selectCell(cell) {
-        setSelectedCell(cell);
-        positionWidgetAtCell(cell);
+        setSelectedCell(cell, { snapWidget: true });
       }
 
       function findCellUnderPoint(clientX, clientY) {
@@ -246,6 +253,20 @@
           element.classList.contains("cell"),
         );
         return cell || null;
+      }
+
+      function getCellUnderWidget() {
+        const rect = widget.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        return findCellUnderPoint(x, y);
+      }
+
+      function updateSelectionFromWidget() {
+        const cell = getCellUnderWidget();
+        if (cell && cell !== selectedCell) {
+          setSelectedCell(cell);
+        }
       }
 
       cells.forEach((cell) => {
@@ -259,6 +280,8 @@
           selectCell(cell);
         });
       });
+
+      setSelectedCell(cells[0], { snapWidget: true });
 
       widget.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
@@ -302,6 +325,8 @@
 
         widget.style.left = `${clampedLeft}px`;
         widget.style.top = `${clampedTop}px`;
+
+        updateSelectionFromWidget();
       });
 
       function endDrag(event) {
