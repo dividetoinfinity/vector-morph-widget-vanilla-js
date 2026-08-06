@@ -144,12 +144,16 @@
         const containerRect = container.getBoundingClientRect();
         const widgetWidth = widget.offsetWidth;
         const widgetHeight = widget.offsetHeight;
+        const thickness = 5;
 
         let left = event.clientX - containerRect.left - offsetX;
         let top = event.clientY - containerRect.top - offsetY;
 
-        left = clamp(left, 0, containerRect.width - widgetWidth);
-        top = clamp(top, 0, containerRect.height - widgetHeight);
+        const maxLeft = containerRect.width - widgetWidth - thickness;
+        const maxTop = containerRect.height - widgetHeight - thickness;
+
+        left = clamp(left, 0, maxLeft);
+        top = clamp(top, 0, maxTop);
 
         widget.style.left = `${left}px`;
         widget.style.top = `${top}px`;
