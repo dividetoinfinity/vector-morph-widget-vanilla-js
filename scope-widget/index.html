@@ -33,83 +33,81 @@
         height: 175px;
         cursor: grab;
         touch-action: none;
+        z-index: 2;
+        background: transparent;
       }
 
       .segment {
         position: absolute;
         background: white;
+        pointer-events: none;
+        z-index: 3;
       }
 
-      /* Horizontal thickness */
       .h {
         height: 5px;
       }
 
-      /* Vertical thickness */
       .v {
         width: 5px;
       }
 
-      /* Top */
       .tl {
         top: 0;
         left: 0;
         width: 35%;
       }
+
       .tr {
         top: 0;
         right: 0;
         width: 35%;
       }
 
-      /* Bottom */
       .bl {
         bottom: 0;
         left: 0;
         width: 35%;
       }
+
       .br {
         bottom: 0;
         right: 0;
         width: 35%;
       }
 
-      /* Left */
       .lt {
         left: 0;
         top: 0;
         height: 35%;
       }
+
       .lb {
         left: 0;
         bottom: 0;
         height: 35%;
       }
 
-      /* Right */
       .rt {
         right: 0;
         top: 0;
         height: 35%;
       }
+
       .rb {
         right: 0;
         bottom: 0;
         height: 35%;
       }
-      /* Grid */
+
       .grid {
         position: absolute;
-        left: 7px;
-        top: 7px;
-        /* transform: translate(-50%, -50%); */
-        width: 600px;
-        height: 300px;
+        inset: 8px;
         display: grid;
-        grid-template-columns: repeat(4, 160px);
-        grid-template-rows: repeat(2, 160px);
-        gap: 15px;
-        z-index: 2;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 8px;
+        z-index: 1;
         pointer-events: none;
       }
 
@@ -123,6 +121,14 @@
         font-size: 60px;
         box-sizing: border-box;
         user-select: none;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+
+      .cell.selected {
+        background: rgba(255, 255, 255, 0.2);
+        /* outline: 2px solid #fff; */
+        /* outline-offset: -2px; */
       }
     </style>
   </head>
@@ -139,6 +145,7 @@
         <div class="segment v rt"></div>
         <div class="segment v rb"></div>
       </div>
+
       <div class="grid">
         <div class="cell">A</div>
         <div class="cell">B</div>
@@ -154,55 +161,174 @@
     <script>
       const container = document.querySelector(".container");
       const widget = document.querySelector(".scopeWidget");
+      const cells = Array.from(document.querySelectorAll(".cell"));
 
       let dragging = false;
       let offsetX = 0;
       let offsetY = 0;
+      let selectedCell = null;
+      let dragPointerId = null;
+      let movedDuringDrag = false;
+      let pointerDownX = 0;
+      let pointerDownY = 0;
+
+      const DRAG_THRESHOLD = 3;
 
       function clamp(value, min, max) {
         return Math.min(Math.max(value, min), max);
       }
 
-      widget.addEventListener("mousedown", (event) => {
-        dragging = true;
-        widget.style.cursor = "grabbing";
-
-        const rect = widget.getBoundingClientRect();
-        offsetX = event.clientX - rect.left;
-        offsetY = event.clientY - rect.top;
-
-        event.preventDefault();
-      });
-
-      document.addEventListener("mousemove", (event) => {
-        if (!dragging) return;
-
+      function clampWidgetPosition(left, top) {
         const containerRect = container.getBoundingClientRect();
         const widgetWidth = widget.offsetWidth;
         const widgetHeight = widget.offsetHeight;
         const thickness = 5;
 
+        const maxLeft = Math.max(
+          0,
+          containerRect.width - widgetWidth - thickness,
+        );
+        const maxTop = Math.max(
+          0,
+          containerRect.height - widgetHeight - thickness,
+        );
+
+        return {
+          left: clamp(left, 0, maxLeft),
+          top: clamp(top, 0, maxTop),
+        };
+      }
+
+      function positionWidgetAtCell(cell) {
+        const containerRect = container.getBoundingClientRect();
+        const cellRect = cell.getBoundingClientRect();
+        const widgetWidth = widget.offsetWidth;
+        const widgetHeight = widget.offsetHeight;
+
+        const left =
+          cellRect.left -
+          containerRect.left +
+          (cellRect.width - widgetWidth) / 2;
+        const top =
+          cellRect.top -
+          containerRect.top +
+          (cellRect.height - widgetHeight) / 2;
+
+        const { left: clampedLeft, top: clampedTop } = clampWidgetPosition(
+          left,
+          top,
+        );
+
+        widget.style.left = `${clampedLeft}px`;
+        widget.style.top = `${clampedTop}px`;
+      }
+
+      function setSelectedCell(cell) {
+        if (selectedCell && selectedCell !== cell) {
+          selectedCell.classList.remove("selected");
+        }
+
+        selectedCell = cell;
+
+        if (selectedCell) {
+          selectedCell.classList.add("selected");
+        }
+      }
+
+      function selectCell(cell) {
+        setSelectedCell(cell);
+        positionWidgetAtCell(cell);
+      }
+
+      function findCellUnderPoint(clientX, clientY) {
+        const elements = document.elementsFromPoint(clientX, clientY);
+        const cell = elements.find((element) =>
+          element.classList.contains("cell"),
+        );
+        return cell || null;
+      }
+
+      cells.forEach((cell) => {
+        cell.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+          selectCell(cell);
+        });
+
+        cell.addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectCell(cell);
+        });
+      });
+
+      widget.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+
+        dragging = true;
+        movedDuringDrag = false;
+        dragPointerId = event.pointerId;
+        pointerDownX = event.clientX;
+        pointerDownY = event.clientY;
+
+        const rect = widget.getBoundingClientRect();
+        offsetX = event.clientX - rect.left;
+        offsetY = event.clientY - rect.top;
+
+        widget.style.cursor = "grabbing";
+        widget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+
+      widget.addEventListener("pointermove", (event) => {
+        if (!dragging || event.pointerId !== dragPointerId) return;
+
+        const dx = event.clientX - pointerDownX;
+        const dy = event.clientY - pointerDownY;
+
+        if (
+          !movedDuringDrag &&
+          (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)
+        ) {
+          movedDuringDrag = true;
+        }
+
+        const containerRect = container.getBoundingClientRect();
         let left = event.clientX - containerRect.left - offsetX;
         let top = event.clientY - containerRect.top - offsetY;
 
-        const maxLeft = containerRect.width - widgetWidth - thickness;
-        const maxTop = containerRect.height - widgetHeight - thickness;
+        const { left: clampedLeft, top: clampedTop } = clampWidgetPosition(
+          left,
+          top,
+        );
 
-        left = clamp(left, 0, maxLeft);
-        top = clamp(top, 0, maxTop);
-
-        widget.style.left = `${left}px`;
-        widget.style.top = `${top}px`;
+        widget.style.left = `${clampedLeft}px`;
+        widget.style.top = `${clampedTop}px`;
       });
 
-      document.addEventListener("mouseup", () => {
-        if (!dragging) return;
+      function endDrag(event) {
+        if (!dragging || event.pointerId !== dragPointerId) return;
+
         dragging = false;
+        dragPointerId = null;
+
+        if (!movedDuringDrag) {
+          const cell = findCellUnderPoint(event.clientX, event.clientY);
+          if (cell) {
+            selectCell(cell);
+          }
+        }
+
         widget.style.cursor = "grab";
-      });
+        if (widget.hasPointerCapture?.(event.pointerId)) {
+          widget.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      widget.addEventListener("pointerup", endDrag);
+      widget.addEventListener("pointercancel", endDrag);
 
       window.addEventListener("blur", () => {
         dragging = false;
+        dragPointerId = null;
         widget.style.cursor = "grab";
       });
     </script>
