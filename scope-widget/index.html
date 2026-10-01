@@ -100,13 +100,13 @@
         height: 35%;
       }
 
-      .grid {
+      .two-x-four-grid {
         position: absolute;
-        inset: 0px;
+        inset: 10px;
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         grid-template-rows: repeat(2, 1fr);
-        gap: 1px;
+        gap: 10px;
         z-index: 1;
         pointer-events: none;
       }
@@ -123,9 +123,10 @@
         user-select: none;
         cursor: pointer;
         pointer-events: auto;
-        transition:
+        /* transition:
           background-color 180ms ease,
           border-color 180ms ease;
+          */
       }
 
       .cell.selected {
@@ -148,7 +149,7 @@
         <div class="segment v rb"></div>
       </div>
 
-      <div class="grid">
+      <div class="two-x-four-grid">
         <div class="cell">A</div>
         <div class="cell">B</div>
         <div class="cell">C</div>
